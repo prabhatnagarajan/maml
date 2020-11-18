@@ -17,23 +17,26 @@ import maml
 class MetaLearnedRegressor(nn.Module):
 
 	def __init__(self):
-       super(MetaLearnedRegressor, self).__init__()
-       self.regressor = torch.nn.Sequential(OrderedDict([
-       ('lin1', nn.Linear(1, 40)),
-       ('relu1', nn.ReLU()),
-       ('lin2', nn.Linear(40, 40)),
-       ('relu2', nn.ReLU()),
-       ('output', nn.Linear(40, 1))]))
+		super(MetaLearnedRegressor, self).__init__()
+		self.regressor = torch.nn.Sequential(OrderedDict([
+			('lin1', nn.Linear(1, 40)),
+			('relu1', nn.ReLU()),
+			('lin2', nn.Linear(40, 40)),
+			('relu2', nn.ReLU()),
+			('output', nn.Linear(40, 1))]))
 
 	def forward(self, inputs):
 	    return self.regressor(inputs)
 
 	def substituted_forward(self, inputs, named_params):
-       x = F.linear(inputs, weight=named_params['regressor.lin1.weight'], bias=named_params['regressor.lin1.bias'])
-       x = F.relu(x)
-       x = F.linear(x, weight=named_params['regressor.lin2.weight'], bias=named_params['regressor.lin2.bias'])
-       x = F.relu(x)
-       return F.linear(x, weight=named_params['regressor.output.weight'], bias=named_params['regressor.output.bias'])
+		x = F.linear(inputs, weight=named_params['regressor.lin1.weight'],
+					 bias=named_params['regressor.lin1.bias'])
+		x = F.relu(x)
+		x = F.linear(x, weight=named_params['regressor.lin2.weight'],
+					 bias=named_params['regressor.lin2.bias'])
+		x = F.relu(x)
+		return F.linear(x, weight=named_params['regressor.output.weight'],
+						bias=named_params['regressor.output.bias'])
 
 class SinusoidTask:
 	def __init__(self, x_low, x_high,
@@ -97,11 +100,11 @@ def plot_true_v_predicted(inputs, labels, predictions, plot_type="plot", label=N
 	axes = plt.gca()
 	plot_func = parse_plot_func(plot_type)
 	plot_func(inputs,labels,label="True")
-  plot_func(inputs,predictions,label="Predictions")
-  plt.ylabel("sinusoid(t)")
-  plt.xlabel("t")
-  plt.legend()
-  plt.title(title)
+	plot_func(inputs,predictions,label="Predictions")
+	plt.ylabel("sinusoid(t)")
+	plt.xlabel("t")
+	plt.legend()
+	plt.title(title)
 	plt.savefig(filename)
 
 
@@ -136,13 +139,8 @@ def demo(network_path):
 	                                         title="K shot Predictions")
 
 if __name__ == '__main__':
-	print("Regressing...")
-	# plot(x=[-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
-	# 	 y=[-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
-	# 	 plot_type="scatter")
 	task_distribution = SinusoidTaskDistribution()
 
-	# y_values = [sinusoid(x, amplitude, phase) for x in x_values]
 
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	regressor = MetaLearnedRegressor()

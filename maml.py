@@ -24,15 +24,14 @@ class MAMLSupervised:
 	def inner_update(self, task, network_copies, num_gradient_updates):
 		network_params = OrderedDict(self.network.named_parameters())
 		for _ in range(num_gradient_updates):
-	       training_inputs, training_labels = task.sample_dataset(dataset_size=self.K_shot)
-	       # TODO: Move to device
-	       predictions = self.network.substituted_forward(torch.tensor(training_inputs, dtype=torch.float,requires_grad=True),
-	                                                                                                  named_params=network_params)
-	       loss = self.subtask_loss(predictions, torch.tensor(training_labels, dtype=torch.float32))
-	          gradients = torch.autograd.grad(loss, network_params.values(), create_graph=True)
-	       network_params = OrderedDict(
-	       (name, param - 0.001 * gradient)
-	       for ((name, param), gradient) in zip(network_params.items(), gradients))
+			training_inputs, training_labels = task.sample_dataset(dataset_size=self.K_shot)
+			# TODO: Move to device
+			predictions = self.network.substituted_forward(torch.tensor(training_inputs, dtype=torch.float,requires_grad=True),
+			                                                                                          named_params=network_params)
+			loss = self.subtask_loss(predictions, torch.tensor(training_labels, dtype=torch.float32))
+			gradients = torch.autograd.grad(loss, network_params.values(), create_graph=True)
+			network_params = OrderedDict((name, param - 0.001 * gradient)
+				for ((name, param), gradient) in zip(network_params.items(), gradients))
 		network_copies.append(network_params)
 
 	def meta_update(self, task_test_batch, network_copies):
@@ -54,7 +53,7 @@ class MAMLSupervised:
 	def check_changed(self, old_params):
 		# perform update
 		for name, params in self.network.named_parameters():
-      assert not (old_params[name] == params).all()
+			assert not (old_params[name] == params).all()
 
 	def train(self):
 		for iteration in range(self.meta_train_iterations):
