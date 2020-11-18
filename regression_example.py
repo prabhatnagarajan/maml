@@ -1,4 +1,5 @@
 import argparse
+from collections import OrderedDict
 
 import matplotlib.colors as mc
 import matplotlib as mpl
@@ -8,10 +9,31 @@ from matplotlib import rc
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from pdb import set_trace
 
 import maml
 
+class MetaLearnedRegressor(nn.Module):
+
+	def __init__(self):
+       super(MetaLearnedRegressor, self).__init__()
+       self.regressor = torch.nn.Sequential(OrderedDict([
+       ('lin1', nn.Linear(1, 40)),
+       ('relu1', nn.ReLU()),
+       ('lin2', nn.Linear(40, 40)),
+       ('relu2', nn.ReLU()),
+       ('output', nn.Linear(40, 1))]))
+
+	def forward(self, inputs):
+	    return self.regressor(inputs)
+
+	def substituted_forward(self, inputs, named_params):
+       x = F.linear(inputs, weight=named_params['regressor.lin1.weight'], bias=named_params['regressor.lin1.bias'])
+       x = F.relu(x)
+       x = F.linear(x, weight=named_params['regressor.lin2.weight'], bias=named_params['regressor.lin2.bias'])
+       x = F.relu(x)
+       return F.linear(x, weight=named_params['regressor.output.weight'], bias=named_params['regressor.output.bias'])
 
 class SinusoidTask:
 	def __init__(self, x_low, x_high,
@@ -68,46 +90,18 @@ def parse_plot_func(plot_func):
 	if plot_func == "plot":
 		return plt.plot
 
-
-def plot(x, y, plot_type="plot", label=None, filename="plot.png"):
-	plt.clf()
-	axes = plt.gca()
-	plot_func = parse_plot_func(plot_type)
-	p = plot_func(x,
-				  y,
-				  label=label)
-	# plt.ticklabel_format(axis='x', style='sci', scilimits=(-2,2))
-		# plt.xticks([interval * i for i in range(len(axis))] + [max(axis)], rotation='vertical')
-
-	# axes.set_ylim([0.0, 4.1])
-	# if self.legend:
-	# 	plt.legend(loc='best')
-	# if self.title:
-	# 	plt.title(self.title)
-	# if self.xlabel:
-	# 	plt.xlabel(self.xlabel)
-	# if ylabel:
-	# 	plt.ylabel(self.ylabel)
-	plt.savefig(filename)
-
-def plot_true_v_predicted(inputs, labels, predictions, plot_type="plot", label=None, filename="plot.png"):
+def plot_true_v_predicted(inputs, labels, predictions, plot_type="plot", label=None,
+                          filename="plot.png",
+                          title="True vs. Predicted"):
 	plt.clf()
 	axes = plt.gca()
 	plot_func = parse_plot_func(plot_type)
 	plot_func(inputs,labels,label="True")
-	plot_func(inputs,predictions,label="True")
-	# plt.ticklabel_format(axis='x', style='sci', scilimits=(-2,2))
-		# plt.xticks([interval * i for i in range(len(axis))] + [max(axis)], rotation='vertical')
-
-	# axes.set_ylim([0.0, 4.1])
-	# if self.legend:
-	# 	plt.legend(loc='best')
-	# if self.title:
-	# 	plt.title(self.title)
-	# if self.xlabel:
-	# 	plt.xlabel(self.xlabel)
-	# if ylabel:
-	# 	plt.ylabel(self.ylabel)
+  plot_func(inputs,predictions,label="Predictions")
+  plt.ylabel("sinusoid(t)")
+  plt.xlabel("t")
+  plt.legend()
+  plt.title(title)
 	plt.savefig(filename)
 
 
@@ -121,6 +115,25 @@ def subtask_optimize(model, predictions, outputs):
 	inner_optimizer.step()
 	return loss_func
 
+def demo(network_path):
+	regressor.load_state_dict(torch.load(network_path))
+	# TODO: move things to device
+	task_distribution = SinusoidTaskDistribution()
+	task = task_distribution.sample_tasks(1)[0]
+	inputs, labels = task.sample_dataset(40)
+	# Before N-updates
+	zero_shot_predictions = regressor(torch.tensor(inputs, dtype=torch.float)).detach().numpy()
+	plot_true_v_predicted(inputs, labels, zero_shot_predictions,
+	                                         plot_type="scatter", filename="0_regressed.png",
+	                                         title="Zero shot Predictions")
+
+	networks = []
+	maml_trainer.inner_update(task, networks, 1)
+	k_shot_predictions = regressor.substituted_forward(torch.tensor(inputs, dtype=torch.float),
+	                                                  named_params=networks[0]).detach().numpy()
+	plot_true_v_predicted(inputs, labels, zero_shot_predictions,
+	                                         plot_type="scatter", filename="1_regressed.png",
+	                                         title="K shot Predictions")
 
 if __name__ == '__main__':
 	print("Regressing...")
@@ -132,19 +145,7 @@ if __name__ == '__main__':
 	# y_values = [sinusoid(x, amplitude, phase) for x in x_values]
 
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-	# regressor = torch.nn.Sequential(OrderedDict([
- #            ('l1',nn.Linear(1,40)),
- #            ('relu1',nn.ReLU()),
- #            ('l2',nn.Linear(40,40)),
- #            ('relu2',nn.ReLU()),
- #            ('l3',nn.Linear(40,1))
- #        ]))
-	regressor = torch.nn.Sequential(
-        nn.Linear(1, 40),
-        nn.ReLU(),
-        nn.Linear(40, 40),
-        nn.ReLU(),
-        nn.Linear(40, 1))
+	regressor = MetaLearnedRegressor()
 	# Move net to device
 
 
