@@ -17,23 +17,26 @@ import maml
 class MetaLearnedRegressor(nn.Module):
 
 	def __init__(self):
-       super(MetaLearnedRegressor, self).__init__()
-       self.regressor = torch.nn.Sequential(OrderedDict([
-       ('lin1', nn.Linear(1, 40)),
-       ('relu1', nn.ReLU()),
-       ('lin2', nn.Linear(40, 40)),
-       ('relu2', nn.ReLU()),
-       ('output', nn.Linear(40, 1))]))
+		super(MetaLearnedRegressor, self).__init__()
+		self.regressor = torch.nn.Sequential(OrderedDict([
+			('lin1', nn.Linear(1, 40)),
+			('relu1', nn.ReLU()),
+			('lin2', nn.Linear(40, 40)),
+			('relu2', nn.ReLU()),
+			('output', nn.Linear(40, 1))]))
 
 	def forward(self, inputs):
 	    return self.regressor(inputs)
 
 	def substituted_forward(self, inputs, named_params):
-       x = F.linear(inputs, weight=named_params['regressor.lin1.weight'], bias=named_params['regressor.lin1.bias'])
-       x = F.relu(x)
-       x = F.linear(x, weight=named_params['regressor.lin2.weight'], bias=named_params['regressor.lin2.bias'])
-       x = F.relu(x)
-       return F.linear(x, weight=named_params['regressor.output.weight'], bias=named_params['regressor.output.bias'])
+		x = F.linear(inputs, weight=named_params['regressor.lin1.weight'],
+					 bias=named_params['regressor.lin1.bias'])
+		x = F.relu(x)
+		x = F.linear(x, weight=named_params['regressor.lin2.weight'],
+					 bias=named_params['regressor.lin2.bias'])
+		x = F.relu(x)
+		return F.linear(x, weight=named_params['regressor.output.weight'],
+						bias=named_params['regressor.output.bias'])
 
 class SinusoidTask:
 	def __init__(self, x_low, x_high,
@@ -97,11 +100,11 @@ def plot_true_v_predicted(inputs, labels, predictions, plot_type="plot", label=N
 	axes = plt.gca()
 	plot_func = parse_plot_func(plot_type)
 	plot_func(inputs,labels,label="True")
-  plot_func(inputs,predictions,label="Predictions")
-  plt.ylabel("sinusoid(t)")
-  plt.xlabel("t")
-  plt.legend()
-  plt.title(title)
+	plot_func(inputs,predictions,label="Predictions")
+	plt.ylabel("sinusoid(t)")
+	plt.xlabel("t")
+	plt.legend()
+	plt.title(title)
 	plt.savefig(filename)
 
 
@@ -136,13 +139,8 @@ def demo(network_path):
 	                                         title="K shot Predictions")
 
 if __name__ == '__main__':
-	print("Regressing...")
-	# plot(x=[-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
-	# 	 y=[-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
-	# 	 plot_type="scatter")
 	task_distribution = SinusoidTaskDistribution()
 
-	# y_values = [sinusoid(x, amplitude, phase) for x in x_values]
 
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	regressor = MetaLearnedRegressor()
@@ -153,9 +151,10 @@ if __name__ == '__main__':
 	meta_optimizer = torch.optim.Adam(regressor.parameters(), lr=meta_step_size)
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--demo", action="store_true", default=False)
+	parser.add_argument("--meta-train-iterations", type=int, default=15000)
 	args = parser.parse_args()
 	maml_trainer = maml.MAMLSupervised(network=regressor,
-			 					   meta_train_iterations=15000,
+			 					   meta_train_iterations=args.meta_train_iterations,
 			 					   num_shots=10,
 			 					   task_distribution=task_distribution,
 			 					   meta_batch_size=25,
@@ -164,17 +163,9 @@ if __name__ == '__main__':
 			 					   subtask_loss=torch.nn.MSELoss(),
 			 					   num_gradient_updates=10)
 	if args.demo:
-		regressor.load_state_dict(torch.load("regressor.pt"))
-		# TODO: move things to device
-		task = task_distribution.sample_tasks(1)[0]
-		inputs, labels = task.sample_dataset(40)
-		networks = []
-		maml_trainer.inner_update(task, networks)
-		predictions = networks[0](torch.tensor(inputs, dtype=torch.float)).detach().numpy()
-
-		plot_true_v_predicted(inputs, labels, predictions, plot_type="scatter", filename="regressed.png")
+		demo("regressor.pt")
 	else:
 		# TODO, add device
 		maml_trainer.train()
-		torch.save(regressor.state_dict())
+		torch.save(regressor.state_dict(), "regressor.pt")
 
