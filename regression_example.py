@@ -9,7 +9,7 @@ from matplotlib import rc
 import numpy as np
 import torch
 import torch.nn as nn
-+import torch.nn.functional as F
+import torch.nn.functional as F
 from pdb import set_trace
 
 import maml
@@ -34,8 +34,6 @@ class MetaLearnedRegressor(nn.Module):
        x = F.linear(x, weight=named_params['regressor.lin2.weight'], bias=named_params['regressor.lin2.bias'])
        x = F.relu(x)
        return F.linear(x, weight=named_params['regressor.output.weight'], bias=named_params['regressor.output.bias'])
-
-
 
 class SinusoidTask:
 	def __init__(self, x_low, x_high,
@@ -95,16 +93,15 @@ def parse_plot_func(plot_func):
 def plot_true_v_predicted(inputs, labels, predictions, plot_type="plot", label=None,
                           filename="plot.png",
                           title="True vs. Predicted"):
-def plot_true_v_predicted(inputs, labels, predictions, plot_type="plot", label=None, filename="plot.png"):
 	plt.clf()
 	axes = plt.gca()
 	plot_func = parse_plot_func(plot_type)
 	plot_func(inputs,labels,label="True")
-    plot_func(inputs,predictions,label="Predictions")
-    plt.ylabel("sinusoid(t)")
-    plt.xlabel("t")
-    plt.legend()
-    plt.title(title)
+  plot_func(inputs,predictions,label="Predictions")
+  plt.ylabel("sinusoid(t)")
+  plt.xlabel("t")
+  plt.legend()
+  plt.title(title)
 	plt.savefig(filename)
 
 
@@ -148,19 +145,7 @@ if __name__ == '__main__':
 	# y_values = [sinusoid(x, amplitude, phase) for x in x_values]
 
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-	# regressor = torch.nn.Sequential(OrderedDict([
- #            ('l1',nn.Linear(1,40)),
- #            ('relu1',nn.ReLU()),
- #            ('l2',nn.Linear(40,40)),
- #            ('relu2',nn.ReLU()),
- #            ('l3',nn.Linear(40,1))
- #        ]))
-	regressor = torch.nn.Sequential(
-        nn.Linear(1, 40),
-        nn.ReLU(),
-        nn.Linear(40, 40),
-        nn.ReLU(),
-        nn.Linear(40, 1))
+	regressor = MetaLearnedRegressor()
 	# Move net to device
 
 

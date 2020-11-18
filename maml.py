@@ -35,14 +35,6 @@ class MAMLSupervised:
 	       for ((name, param), gradient) in zip(network_params.items(), gradients))
 		network_copies.append(network_params)
 
-	def inner_update(self, task, network_copies):
-		training_inputs, training_labels = task.sample_dataset(dataset_size=self.K_shot)
-		# TODO: Move to device
-		predictions = network_copy(torch.tensor(training_inputs, dtype=torch.float))
-		task_loss_func = self.subtask_optimize(network_copy, predictions,
-											   torch.tensor(training_labels, dtype=torch.float32))
-		network_copies.append(network_copy)
-
 	def meta_update(self, task_test_batch, network_copies):
 		losses = []
 		for i in range(len(task_test_batch)):
@@ -62,8 +54,7 @@ class MAMLSupervised:
 	def check_changed(self, old_params):
 		# perform update
 		for name, params in self.network.named_parameters():
-			assert not (old_params[name] == params).all()
-
+      assert not (old_params[name] == params).all()
 
 	def train(self):
 		for iteration in range(self.meta_train_iterations):
