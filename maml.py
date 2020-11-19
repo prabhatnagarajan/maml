@@ -1,7 +1,6 @@
 import torch
 from collections import OrderedDict 
 
-
 class SupervisedMAML:
 
 	def __init__(self, network,
@@ -53,7 +52,7 @@ class SupervisedMAML:
 		    old_params[name] = params.clone()
 		meta_loss.backward()
 		self.optimizer.step()
-		self.meta_losses.append(meta_loss)
+		self.meta_losses.append(meta_loss.detach().numpy())
 		self.check_changed(old_params)
 
 	def check_changed(self, old_params):
@@ -75,5 +74,6 @@ class SupervisedMAML:
 				testing_inputs, testing_labels = task.sample_dataset(dataset_size=self.K_shot)
 				task_test_batch.append((testing_inputs, testing_labels))
 			self.meta_update(task_test_batch, network_copies)
-			print("Completed iteration " + str(iteration))
+			if (iteration + 1) % int(self.meta_train_iterations / 100) == 0 or self.meta_train_iterations <= 100:
+				print("Completed iteration " + str(iteration + 1))
 
