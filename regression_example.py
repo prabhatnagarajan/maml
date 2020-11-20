@@ -10,7 +10,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pdb import set_trace
 
 import maml
 
@@ -107,17 +106,6 @@ def plot_true_v_predicted(inputs, labels, predictions, plot_type="plot", label=N
 	plt.title(title)
 	plt.savefig(filename)
 
-
-def subtask_optimize(model, predictions, outputs):
-	inner_lr = 0.001
-	inner_optimizer = torch.optim.SGD(model.parameters(), lr=inner_lr)
-	loss_func = torch.nn.MSELoss()
-	loss = loss_func(predictions, outputs)
-	inner_optimizer.zero_grad()
-	loss.backward()
-	inner_optimizer.step()
-	return loss_func
-
 def demo(network_path):
 	regressor.load_state_dict(torch.load(network_path))
 	# TODO: move things to device
@@ -134,32 +122,29 @@ def demo(network_path):
 	maml_trainer.inner_update(task, networks, 1)
 	k_shot_predictions = regressor.substituted_forward(torch.tensor(inputs, dtype=torch.float),
 	                                                  named_params=networks[0]).detach().numpy()
-	plot_true_v_predicted(inputs, labels, zero_shot_predictions,
+	plot_true_v_predicted(inputs, labels, k_shot_predictions,
 	                                         plot_type="scatter", filename="1_regressed.png",
 	                                         title="K shot Predictions")
 
 if __name__ == '__main__':
-	task_distribution = SinusoidTaskDistribution()
-
-
-	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-	regressor = MetaLearnedRegressor()
-	# Move net to device
-
-
-	meta_step_size = 0.001
-	meta_optimizer = torch.optim.Adam(regressor.parameters(), lr=meta_step_size)
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--demo", action="store_true", default=False)
 	parser.add_argument("--meta-train-iterations", type=int, default=15000)
+	parser.add_argument("--meta-step-size", type=float, default=0.001)
+	parser.add_argument("--meta-batch-size", type=int, default=25)
 	args = parser.parse_args()
-	maml_trainer = maml.MAMLSupervised(network=regressor,
+	regressor = MetaLearnedRegressor()
+	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+	# TODO:Move net to device
+	meta_optimizer = torch.optim.Adam(regressor.parameters(), lr=args.meta_step_size)
+	task_distribution = SinusoidTaskDistribution()
+	maml_trainer = maml.SupervisedMAML(network=regressor,
 			 					   meta_train_iterations=args.meta_train_iterations,
+			 					   inner_step_size=0.01,
 			 					   num_shots=10,
 			 					   task_distribution=task_distribution,
-			 					   meta_batch_size=25,
+			 					   meta_batch_size=args.meta_batch_size,
 			 					   optimizer=meta_optimizer,
-			 					   subtask_optimize=subtask_optimize,
 			 					   subtask_loss=torch.nn.MSELoss(),
 			 					   num_gradient_updates=10)
 	if args.demo:
@@ -167,5 +152,7 @@ if __name__ == '__main__':
 	else:
 		# TODO, add device
 		maml_trainer.train()
-		torch.save(regressor.state_dict(), "regressor.pt")
+		import os
+		os.makedirs("results", exist_ok=True)
+		torch.save(regressor.state_dict(), "results/regressor.pt")
 

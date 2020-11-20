@@ -1,25 +1,27 @@
 import torch
 from collections import OrderedDict 
 
-
-class MAMLSupervised:
+class SupervisedMAML:
 
 	def __init__(self, network,
-				 meta_train_iterations, num_shots,
-				 task_distribution, meta_batch_size, optimizer,
-				 subtask_optimize, num_gradient_updates,
+				 meta_train_iterations,
+				 num_shots,
+				 inner_step_size,
+				 task_distribution,
+				 meta_batch_size,
+				 optimizer,
+				 num_gradient_updates,
 				 subtask_loss):
 		self.network = network
-		self.net_weights = list(self.network.parameters())
 		self.meta_train_iterations = meta_train_iterations
+		self.inner_step_size = inner_step_size
 		self.K_shot = num_shots
 		self.task_distribution = task_distribution
 		self.meta_batch_size = meta_batch_size
 		self.optimizer = optimizer
-		self.subtask_optimize = subtask_optimize
 		self.subtask_loss = subtask_loss
 		self.num_gradient_updates = num_gradient_updates
-		self.count_non_updates = 0
+		self.meta_losses = []
 
 	def inner_update(self, task, network_copies, num_gradient_updates):
 		network_params = OrderedDict(self.network.named_parameters())
@@ -30,7 +32,7 @@ class MAMLSupervised:
 			                                                                                          named_params=network_params)
 			loss = self.subtask_loss(predictions, torch.tensor(training_labels, dtype=torch.float32))
 			gradients = torch.autograd.grad(loss, network_params.values(), create_graph=True)
-			network_params = OrderedDict((name, param - 0.001 * gradient)
+			network_params = OrderedDict((name, param - self.inner_step_size * gradient)
 				for ((name, param), gradient) in zip(network_params.items(), gradients))
 		network_copies.append(network_params)
 
@@ -50,17 +52,15 @@ class MAMLSupervised:
 		    old_params[name] = params.clone()
 		meta_loss.backward()
 		self.optimizer.step()
+		self.meta_losses.append(meta_loss.detach().numpy())
 		self.check_changed(old_params)
 
 	def check_changed(self, old_params):
 		# perform update
-		unchanged = True
 		for name, params in self.network.named_parameters():
-			unchanged = unchanged and not (old_params[name] == params).all()
-		if not unchanged:
-			self.count_non_updates += 1
-			if self.count_non_updates > 5:
-				assert False
+			if (old_params[name] == params).all():
+				print("Issue!")
+			# assert not (old_params[name] == params).all()
 
 	def train(self):
 		for iteration in range(self.meta_train_iterations):
@@ -76,5 +76,6 @@ class MAMLSupervised:
 				testing_inputs, testing_labels = task.sample_dataset(dataset_size=self.K_shot)
 				task_test_batch.append((testing_inputs, testing_labels))
 			self.meta_update(task_test_batch, network_copies)
-			print("Completed iteration " + str(iteration))
+			if self.meta_train_iterations <= 100 or (iteration + 1) % int(self.meta_train_iterations / 100) == 0:
+				print("Completed meta iteration " + str(iteration + 1))
 
