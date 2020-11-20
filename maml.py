@@ -77,5 +77,5 @@ class SupervisedMAML:
 				task_test_batch.append((testing_inputs, testing_labels))
 			self.meta_update(task_test_batch, network_copies)
 			if self.meta_train_iterations <= 100 or (iteration + 1) % int(self.meta_train_iterations / 100) == 0:
-				print("Completed iteration " + str(iteration + 1))
+				print("Completed meta iteration " + str(iteration + 1))
 
