@@ -122,7 +122,7 @@ def demo(network_path):
 	maml_trainer.inner_update(task, networks, 1)
 	k_shot_predictions = regressor.substituted_forward(torch.tensor(inputs, dtype=torch.float),
 	                                                  named_params=networks[0]).detach().numpy()
-	plot_true_v_predicted(inputs, labels, zero_shot_predictions,
+	plot_true_v_predicted(inputs, labels, k_shot_predictions,
 	                                         plot_type="scatter", filename="1_regressed.png",
 	                                         title="K shot Predictions")
 
