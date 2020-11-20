@@ -1,5 +1,8 @@
-import torch
+import os
 from collections import OrderedDict 
+
+import torch
+
 
 class SupervisedMAML:
 
@@ -11,7 +14,8 @@ class SupervisedMAML:
 				 meta_batch_size,
 				 optimizer,
 				 num_gradient_updates,
-				 subtask_loss):
+				 subtask_loss,
+				 results_dir):
 		self.network = network
 		self.meta_train_iterations = meta_train_iterations
 		self.inner_step_size = inner_step_size
@@ -21,6 +25,7 @@ class SupervisedMAML:
 		self.optimizer = optimizer
 		self.subtask_loss = subtask_loss
 		self.num_gradient_updates = num_gradient_updates
+		self.results_dir = results_dir
 		self.meta_losses = []
 
 	def inner_update(self, task, network_copies, num_gradient_updates):
@@ -62,6 +67,16 @@ class SupervisedMAML:
 				print("Issue!")
 			# assert not (old_params[name] == params).all()
 
+	def housekeep(self):
+		# save network
+		self.save_network()
+		#: Plot meta-losses
+
+	def save_network(self):
+		os.makedirs(self.results_dir, exist_ok=True)
+		torch.save(self.network.state_dict(),
+				   os.path.join(self.results_dir,"network.pt"))
+
 	def train(self):
 		for iteration in range(self.meta_train_iterations):
 			# sample training tasks
@@ -78,4 +93,5 @@ class SupervisedMAML:
 			self.meta_update(task_test_batch, network_copies)
 			if self.meta_train_iterations <= 100 or (iteration + 1) % int(self.meta_train_iterations / 100) == 0:
 				print("Completed meta iteration " + str(iteration + 1))
+		self.housekeep()
 

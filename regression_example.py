@@ -1,5 +1,6 @@
 import argparse
 from collections import OrderedDict
+import os
 
 import matplotlib.colors as mc
 import matplotlib as mpl
@@ -100,35 +101,51 @@ def plot_true_v_predicted(inputs, labels, predictions, plot_type="plot", label=N
 	plot_func = parse_plot_func(plot_type)
 	plot_func(inputs,labels,label="True")
 	plot_func(inputs,predictions,label="Predictions")
+	plt.xlim(-6, 6.)
+	plt.ylim(-6, 6)
 	plt.ylabel("sinusoid(t)")
 	plt.xlabel("t")
 	plt.legend()
 	plt.title(title)
 	plt.savefig(filename)
 
-def demo(network_path):
-	regressor.load_state_dict(torch.load(network_path))
-	# TODO: move things to device
-	task_distribution = SinusoidTaskDistribution()
-	task = task_distribution.sample_tasks(1)[0]
+def predict_and_plot(regressor, task, title, file_suffix):
 	inputs, labels = task.sample_dataset(40)
 	# Before N-updates
 	zero_shot_predictions = regressor(torch.tensor(inputs, dtype=torch.float)).detach().numpy()
 	plot_true_v_predicted(inputs, labels, zero_shot_predictions,
-	                                         plot_type="scatter", filename="0_regressed.png",
-	                                         title="Zero shot Predictions")
-
+	                                         plot_type="scatter", filename="0_shot_"+ file_suffix +".png",
+	                                         title=title + ": Zero shot")
 	networks = []
-	maml_trainer.inner_update(task, networks, 1)
+	maml_trainer.inner_update(task, networks, 10)
 	k_shot_predictions = regressor.substituted_forward(torch.tensor(inputs, dtype=torch.float),
 	                                                  named_params=networks[0]).detach().numpy()
 	plot_true_v_predicted(inputs, labels, k_shot_predictions,
-	                                         plot_type="scatter", filename="1_regressed.png",
-	                                         title="K shot Predictions")
+	                      plot_type="scatter",
+	                      filename="k_shot_"+ file_suffix +".png",
+	                      title=title + ": 10 gradient updates")
+
+def demo(network_path, regressor):
+	regressor.load_state_dict(torch.load(network_path))
+	# TODO: move things to device
+	task_distribution = SinusoidTaskDistribution()
+	task = task_distribution.sample_tasks(1)[0]
+	predict_and_plot(regressor, task, "Randomly sampled task", "rnd_task")
+	task_low = SinusoidTask(x_low=-5.0,
+							x_high=5.0,
+							amplitude=0.1,
+							phase=0.0)
+	predict_and_plot(regressor, task_low, "Lowest Extreme task", "low_extreme")
+	task_high = SinusoidTask(x_low=-5.0,
+							x_high=5.0,
+							amplitude=5.0,
+							phase=np.pi)
+	predict_and_plot(regressor, task_high, "Highest Extreme task", "high_extreme")
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--demo", action="store_true", default=False)
+	parser.add_argument("--results-dir", type=str, default="results")
 	parser.add_argument("--meta-train-iterations", type=int, default=15000)
 	parser.add_argument("--meta-step-size", type=float, default=0.001)
 	parser.add_argument("--meta-batch-size", type=int, default=25)
@@ -146,13 +163,11 @@ if __name__ == '__main__':
 			 					   meta_batch_size=args.meta_batch_size,
 			 					   optimizer=meta_optimizer,
 			 					   subtask_loss=torch.nn.MSELoss(),
-			 					   num_gradient_updates=10)
+			 					   num_gradient_updates=10,
+			 					   results_dir=args.results_dir)
 	if args.demo:
-		demo("regressor.pt")
+		demo(os.path.join(args.results_dir, "regressor.pt"), regressor)
 	else:
 		# TODO, add device
 		maml_trainer.train()
-		import os
-		os.makedirs("results", exist_ok=True)
-		torch.save(regressor.state_dict(), "results/regressor.pt")
 
