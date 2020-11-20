@@ -58,7 +58,9 @@ class SupervisedMAML:
 	def check_changed(self, old_params):
 		# perform update
 		for name, params in self.network.named_parameters():
-			assert not (old_params[name] == params).all()
+			if (old_params[name] == params).all():
+				print("Issue!")
+			# assert not (old_params[name] == params).all()
 
 	def train(self):
 		for iteration in range(self.meta_train_iterations):
@@ -74,6 +76,6 @@ class SupervisedMAML:
 				testing_inputs, testing_labels = task.sample_dataset(dataset_size=self.K_shot)
 				task_test_batch.append((testing_inputs, testing_labels))
 			self.meta_update(task_test_batch, network_copies)
-			if (iteration + 1) % int(self.meta_train_iterations / 100) == 0 or self.meta_train_iterations <= 100:
+			if self.meta_train_iterations <= 100 or (iteration + 1) % int(self.meta_train_iterations / 100) == 0:
 				print("Completed iteration " + str(iteration + 1))
 

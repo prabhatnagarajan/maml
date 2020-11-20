@@ -152,5 +152,7 @@ if __name__ == '__main__':
 	else:
 		# TODO, add device
 		maml_trainer.train()
-		torch.save(regressor.state_dict(), "regressor.pt")
+		import os
+		os.makedirs("results", exist_ok=True)
+		torch.save(regressor.state_dict(), "results/regressor.pt")
 
