@@ -148,22 +148,30 @@ if __name__ == '__main__':
 	parser.add_argument("--results-dir", type=str, default="results")
 	parser.add_argument("--meta-train-iterations", type=int, default=15000)
 	parser.add_argument("--meta-step-size", type=float, default=0.001)
+	parser.add_argument("--inner-step-size", type=float, default=0.01)
 	parser.add_argument("--meta-batch-size", type=int, default=25)
+	parser.add_argument("--num-gradient-updates", type=int, default=10)
+	parser.add_argument("--num-shots", type=int, default=10)
+	parser.add_argument("--device", choices=["gpu", "cuda", "cpu"], default="cpu")
 	args = parser.parse_args()
 	regressor = MetaLearnedRegressor()
-	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+	if args.device == "cuda" or args.device == "gpu":
+		assert torch.cuda.is_available()
+		device = torch.device("cuda")
+	else:
+		device = torch.device("cpu")
 	# TODO:Move net to device
 	meta_optimizer = torch.optim.Adam(regressor.parameters(), lr=args.meta_step_size)
 	task_distribution = SinusoidTaskDistribution()
 	maml_trainer = maml.SupervisedMAML(network=regressor,
 			 					   meta_train_iterations=args.meta_train_iterations,
-			 					   inner_step_size=0.01,
-			 					   num_shots=10,
+			 					   inner_step_size=args.inner_step_size,
+			 					   num_shots=args.num_shots,
 			 					   task_distribution=task_distribution,
 			 					   meta_batch_size=args.meta_batch_size,
 			 					   optimizer=meta_optimizer,
 			 					   subtask_loss=torch.nn.MSELoss(),
-			 					   num_gradient_updates=10,
+			 					   num_gradient_updates=args.num_gradient_updates,
 			 					   results_dir=args.results_dir)
 	if args.demo:
 		demo(os.path.join(args.results_dir, "regressor.pt"), regressor)
